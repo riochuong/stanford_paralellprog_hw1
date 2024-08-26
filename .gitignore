@@ -1,0 +1,5 @@
+*.o
+objs/*
+mandelbrot
+*.ppm
+.vscode/*
