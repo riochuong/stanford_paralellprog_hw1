@@ -35,26 +35,32 @@ void workerThreadStart(WorkerArgs * const args) {
     // program that uses two threads, thread 0 could compute the top
     // half of the image and thread 1 could compute the bottom half.
 
-    printf("Hello world from thread %d\n", args->threadId);
-    int numRows = args->height / args->numThreads;
-    // last thread get the remaning row if height is not a multiple of num_threads 
-    if (args->threadId == (args->numThreads - 1)) {
-        numRows = args->height - ((args->numThreads - 1) * numRows);
-    }
-    int startRow = args->threadId * (args->height / args->numThreads);
+    //printf("Hello world from thread %d\n", args->threadId);
+    double startTime = CycleTimer::currentSeconds();
+    // int numRows = args->height / args->numThreads;
+    // // last thread get the remaning row if height is not a multiple of num_threads 
+    // if (args->threadId == (args->numThreads - 1)) {
+    //     numRows = args->height - ((args->numThreads - 1) * numRows);
+    // }
+    int startRow = args->threadId;
 
-    mandelbrotSerial(
-        args->x0, //float x0, 
-        args->y0, //float y0, 
-        args->x1, //float x1, 
-        args->y1, //float y1,
-        args->width, // width, 
-        args->height, // int height,
-        startRow,
-        numRows,
-        args->maxIterations, //int maxIterations,
-        args->output
-    );
+    for (uint32_t row = startRow; row < args->height; row += args->numThreads){
+        mandelbrotSerial(
+            args->x0, //float x0, 
+            args->y0, //float y0, 
+            args->x1, //float x1, 
+            args->y1, //float y1,
+            args->width, // width, 
+            args->height, // int height,
+            row,
+            1,
+            args->maxIterations, //int maxIterations,
+            args->output
+        );
+    }
+   
+    double endTime = CycleTimer::currentSeconds();
+    printf("Thread execute time %.4fms\n", (endTime - startTime)*1000);
 }
 
 //
@@ -68,7 +74,7 @@ void mandelbrotThread(
     int width, int height,
     int maxIterations, int output[])
 {
-    static constexpr int MAX_THREADS = 2;
+    static constexpr int MAX_THREADS = 16;
 
     if (numThreads > MAX_THREADS)
     {
@@ -104,8 +110,8 @@ void mandelbrotThread(
         workers[i] = std::thread(workerThreadStart, &args[i]);
     }
     
+    
     workerThreadStart(&args[0]);
-
     // join worker threads
     for (int i=1; i<numThreads; i++) {
         workers[i].join();
