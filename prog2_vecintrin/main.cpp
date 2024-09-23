@@ -249,6 +249,71 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+  int num_iterations = N / VECTOR_WIDTH;
+  // use this for vector that is not completely fit 
+  int remainings = N - (VECTOR_WIDTH * num_iterations);
+  if (remainings) num_iterations += 1;
+  __cs149_vec_int vect_zeros = _cs149_vset_int(0);
+  __cs149_vec_int vect_ones = _cs149_vset_int(1);
+  __cs149_vec_float vect_max = _cs149_vset_float(9.999999f);
+  __cs149_mask copy_mask = _cs149_init_ones(); 
+  int custom_mask [VECTOR_WIDTH] = {0};
+  for (int i = 0; i < num_iterations; i++){
+      int start_idx = i * VECTOR_WIDTH;
+      __cs149_mask vect_masks = _cs149_init_ones();
+      // fix the mask for overflow value that not fitting
+      if (i == (num_iterations - 1) && remainings){
+          for (int i = 0; i < remainings; i++) {custom_mask[i] = 1;}
+          __cs149_vec_int tmp_vect;
+          _cs149_vload_int(tmp_vect, custom_mask, vect_masks);
+          // update vect masks 
+          _cs149_veq_int(vect_masks, tmp_vect, vect_ones, vect_masks);
+          copy_mask = _cs149_mask_and(copy_mask, vect_masks);
+      }
+      __cs149_mask reverse_mask;
+      __cs149_vec_float vect_vals;
+      __cs149_vec_int vect_exp = _cs149_vset_int(0);
+      __cs149_vec_float vect_results = _cs149_vset_float(1.0); 
+      __cs149_mask vect_mask_max_check;
+      _cs149_vload_float(vect_vals, &values[start_idx], vect_masks);
+      _cs149_vload_int(vect_exp, &exponents[start_idx], vect_masks);
+      // update initial vect masks with anything already zeros
+      _cs149_vgt_int(vect_masks, vect_exp, vect_zeros, vect_masks);
+
+      while(_cs149_cntbits(vect_masks)){
+          _cs149_vmult_float(vect_results, vect_vals, vect_results, vect_masks);
+          _cs149_vsub_int(vect_exp, vect_exp, vect_ones, vect_masks);
+          // update vect masks per clamp
+          // mask check if values greater than max 9.999999f
+          _cs149_vgt_float(vect_mask_max_check, vect_results, vect_max, vect_masks);
+          vect_mask_max_check = _cs149_mask_and(vect_mask_max_check, vect_masks);
+         // update vect masks per exponet
+          // if (i == num_iterations - 1){
+          //   printf("vectmasks %d %f %d %f\n", 
+          //     vect_mask_max_check.value[0], 
+          //     vect_results.value[0], 
+          //     vect_masks.value[0], 
+          //     vect_max.value[0]);
+          // } 
+          // set max value and these will be frozen on next iteration
+          _cs149_vset_float(vect_results, 9.999999f, vect_mask_max_check);
+          
+          // if (i == num_iterations - 1){
+          //   printf("vectmasks after %d %f %d %f\n", 
+          //     vect_mask_max_check.value[0], 
+          //     vect_results.value[0], 
+          //     vect_masks.value[0], 
+          //     vect_max.value[0]);
+          // } 
+          
+          _cs149_vgt_int(vect_masks, vect_exp, vect_zeros, vect_masks);
+          // smaller than 9.999f && exponent greater than 0
+          reverse_mask = _cs149_mask_not(vect_mask_max_check);
+          vect_masks = _cs149_mask_and(vect_masks, reverse_mask);
+      }
+      // copy result back to output
+      _cs149_vstore_float(&output[start_idx], vect_results, copy_mask);
+  }
   
 }
 
